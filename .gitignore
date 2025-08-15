@@ -209,5 +209,5 @@ __marimo__/
 *.tif
 *.tiff
 data/
-
-"static/previews/*.png" 
+static/previews/*.png
+ 
