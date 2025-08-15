@@ -210,3 +210,4 @@ __marimo__/
 *.tiff
 data/
 
+"static/previews/*.png" 
