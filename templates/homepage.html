@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Landing Page</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f4f4f4;
+    }
+
+    .landing {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      min-height: 100vh;
+    }
+
+    .content {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 60px;
+      background-color: #fff;
+    }
+
+    h1 {
+      font-size: 40px;
+      color: #00796b;
+      margin-bottom: 20px;
+    }
+
+    p {
+      font-size: 18px;
+      color: #555;
+    }
+
+    .btn {
+      margin-top: 40px;
+    }
+
+    .btn a button {
+      padding: 12px 25px;
+      font-size: 20px;
+      background-color: #00796b;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .btn a button:hover {
+      background-color: #004d40;
+    }
+
+    .image {
+      background-image: url("{{ url_for('static', filename='images/earth.jpg') }}");
+      background-size: cover;
+      background-position: center;
+    }
+
+    @media (max-width: 768px) {
+      .landing {
+        grid-template-columns: 1fr;
+      }
+      .content {
+        text-align: center;
+        padding: 30px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="landing">
+    <div class="content">
+      <h1>Earth from Above: Robust Monitoring</h1>
+      <p>This project uses Bhoonidhi satellite data for NDVI & Water Change Detection.</p>
+      <div class="btn">
+        <a href="{{ url_for('index') }}">
+          <button>Go to Detection Page</button>
+        </a>
+      </div>
+    </div>
+    <div class="image"></div>
+  </div>
+</body>
+</html>

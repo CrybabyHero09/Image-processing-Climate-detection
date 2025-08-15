@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NDVI & Water Change Detection</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+</head>
+<body>
+  <div class="landing">
+    <div class="content">
+      <h1>🛰 NDVI & Water Change Detection</h1>
+      <p>Select your NDVI and Water Fraction images below:</p>
+
+      <form id="imageForm">
+        <label><strong>📅 Older NDVI Image:</strong></label>
+        <select id="ndvi_old">
+          {% for file in ndvi_files %}
+            <option value="{{ file }}">{{ file }}</option>
+          {% endfor %}
+        </select>
+
+        <label><strong>📅 Recent NDVI Image:</strong></label>
+        <select id="ndvi_new">
+          {% for file in ndvi_files %}
+            <option value="{{ file }}">{{ file }}</option>
+          {% endfor %}
+        </select>
+
+        <label><strong>💧 Older Water Image:</strong></label>
+        <select id="water_old">
+          {% for file in water_files %}
+            <option value="{{ file }}">{{ file }}</option>
+          {% endfor %}
+        </select>
+
+        <label><strong>💧 Recent Water Image:</strong></label>
+        <select id="water_new">
+          {% for file in water_files %}
+            <option value="{{ file }}">{{ file }}</option>
+          {% endfor %}
+        </select>
+
+        <button type="submit">Load Images</button>
+      </form>
+
+      <div class="canvas-container-wrapper">
+        <h2>🌿 NDVI Image Preview</h2>
+        <canvas id="imageCanvas"></canvas>
+      </div>
+
+      <button id="submitAOI">Submit NDVI AOI</button>
+      <div id="result" class="result-box"></div>
+
+      <div class="canvas-container-wrapper">
+        <h2>💧 Water Image Preview</h2>
+        <canvas id="waterCanvas"></canvas>
+      </div>
+
+      <button id="submitWaterAOI">Submit Water AOI</button>
+      <div id="water_result" class="result-box"></div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = new fabric.Canvas("imageCanvas", { selection: false });
+    const waterCanvas = new fabric.Canvas("waterCanvas", { selection: false });
+
+    // Enable rectangle drawing for NDVI & Water
+    const getNDVIRect = enableRectangleDrawing(canvas, 'rgba(255,0,0,0.3)');
+    const getWaterRect = enableRectangleDrawing(waterCanvas, 'rgba(0,0,255,0.3)');
+
+    function enableRectangleDrawing(targetCanvas, rectColor) {
+      let isDrawing = false, startX, startY, rect;
+
+      targetCanvas.on('mouse:down', function (opt) {
+        const pointer = targetCanvas.getPointer(opt.e);
+        isDrawing = true;
+        startX = pointer.x;
+        startY = pointer.y;
+
+        if (rect) targetCanvas.remove(rect);
+
+        rect = new fabric.Rect({
+          left: startX,
+          top: startY,
+          width: 0,
+          height: 0,
+          fill: rectColor,
+          stroke: rectColor === 'rgba(255,0,0,0.3)' ? 'red' : 'blue',
+          strokeWidth: 2,
+          selectable: false
+        });
+
+        targetCanvas.add(rect);
+      });
+
+      targetCanvas.on('mouse:move', function (opt) {
+        if (!isDrawing) return;
+        const pointer = targetCanvas.getPointer(opt.e);
+
+        rect.set({
+          width: Math.abs(pointer.x - startX),
+          height: Math.abs(pointer.y - startY),
+          left: pointer.x < startX ? pointer.x : startX,
+          top: pointer.y < startY ? pointer.y : startY
+        });
+
+        targetCanvas.renderAll();
+      });
+
+      targetCanvas.on('mouse:up', function () {
+        isDrawing = false;
+      });
+
+      return () => rect;
+    }
+
+    // Submit NDVI AOI
+    document.getElementById("submitAOI").addEventListener("click", async function () {
+      const rect = getNDVIRect();
+      if (!rect) return alert("Draw NDVI AOI first.");
+
+      const polygonCoords = [
+        [rect.left, rect.top],
+        [rect.left + rect.width, rect.top],
+        [rect.left + rect.width, rect.top + rect.height],
+        [rect.left, rect.top + rect.height],
+        [rect.left, rect.top]
+      ];
+
+      const geojson = {
+        type: "Feature",
+        geometry: { type: "Polygon", coordinates: [polygonCoords] }
+      };
+
+      const image1 = document.getElementById("ndvi_old").value;
+      const image2 = document.getElementById("ndvi_new").value;
+
+      const res = await fetch("/submit_aoi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image1, image2, geojson, previewWidth: canvas.getWidth() })
+      });
+
+      const result = await res.json();
+      const resultDiv = document.getElementById("result");
+      resultDiv.style.display = "block";
+      resultDiv.innerHTML = `
+        ✅ <strong>NDVI Change Pixels</strong>: ${result.change_pixels}<br>
+        📉 <strong>Vegetation Decrease</strong>: ${result.change_percent}%`;
+    });
+
+    // Submit Water AOI
+    document.getElementById("submitWaterAOI").addEventListener("click", async function () {
+      const rect = getWaterRect();
+      if (!rect) return alert("Draw Water AOI first.");
+
+      const polygonCoords = [
+        [rect.left, rect.top],
+        [rect.left + rect.width, rect.top],
+        [rect.left + rect.width, rect.top + rect.height],
+        [rect.left, rect.top + rect.height],
+        [rect.left, rect.top]
+      ];
+
+      const geojson = {
+        type: "Feature",
+        geometry: { type: "Polygon", coordinates: [polygonCoords] }
+      };
+
+      const image1 = document.getElementById("water_old").value;
+      const image2 = document.getElementById("water_new").value;
+
+      const res = await fetch("/submit_water_aoi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image1, image2, geojson, previewWidth: waterCanvas.getWidth() })
+      });
+
+      const result = await res.json();
+      const waterDiv = document.getElementById("water_result");
+      waterDiv.style.display = "block";
+      waterDiv.innerHTML = `
+        💧 <strong>Water Change Pixels</strong>: ${result.change_pixels}<br>
+        📊 <strong>Water Increase</strong>: ${result.percent_change}%`;
+    });
+
+    // Load preview images
+    document.getElementById("imageForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      const ndvi_image2 = document.getElementById("ndvi_new").value;
+      const ndviRes = await fetch(`/preview_image?filename=${ndvi_image2}`);
+      const ndviData = await ndviRes.json();
+
+      const ndviImg = new Image();
+      ndviImg.onload = function () {
+        resizeCanvas(canvas, ndviImg);
+        const fabricNDVI = new fabric.Image(ndviImg, {
+          scaleX: canvas.width / ndviImg.width,
+          scaleY: canvas.height / ndviImg.height,
+          selectable: false
+        });
+        canvas.setBackgroundImage(fabricNDVI, canvas.renderAll.bind(canvas));
+        document.getElementById("submitAOI").style.display = "block";
+      };
+      ndviImg.src = ndviData.url;
+
+      const water_image2 = document.getElementById("water_new").value;
+      const waterRes = await fetch(`/preview_image?filename=${water_image2}`);
+      const waterData = await waterRes.json();
+
+      const waterImg = new Image();
+      waterImg.onload = function () {
+        resizeCanvas(waterCanvas, waterImg);
+        const fabricWater = new fabric.Image(waterImg, {
+          scaleX: waterCanvas.width / waterImg.width,
+          scaleY: waterCanvas.height / waterImg.height,
+          selectable: false
+        });
+        waterCanvas.setBackgroundImage(fabricWater, waterCanvas.renderAll.bind(waterCanvas));
+        document.getElementById("submitWaterAOI").style.display = "block";
+      };
+      waterImg.src = waterData.url;
+    });
+
+    function resizeCanvas(targetCanvas, img) {
+      const contentWidth = document.querySelector('.content').clientWidth;
+      const scale = contentWidth / img.width;
+      targetCanvas.setWidth(img.width * scale);
+      targetCanvas.setHeight(img.height * scale);
+    }
+  </script>
+</body>
+</html>
